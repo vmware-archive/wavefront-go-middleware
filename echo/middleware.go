@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/gookit/color"
 	"github.com/labstack/echo"
 	"github.com/opentracing/opentracing-go"
 	"github.com/wavefronthq/wavefront-opentracing-sdk-go/tracer"
@@ -14,17 +15,14 @@ func AddDynamicTags(context *echo.Context, tags map[string]interface{}) {
 	(*context).Set("dynamicTags", tags)
 }
 
-//middlewareTracing custom echoWeb middleware.
+//TracingHandler custom echoWeb middleware.
 //Enables tracing for the routes defined in tracer-config.go.
 //Injects respective tags for each route defined in the span of each trace.
-func middlewareTracing(next echo.HandlerFunc) echo.HandlerFunc {
+func TracingHandler(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(context echo.Context) error {
 		//Mapping path and request type to Http request to get corresponding tags
 		if routeToTagMapValue, ok := globalTracerConfig.RouteToTagsMap[context.Path()+"."+context.Request().Method]; ok {
-			span, parentSpanID, err := StartTraceSpan(context, routeToTagMapValue.OperationName, routeToTagMapValue.Metatags)
-			if err != nil {
-				log.Println(err)
-			}
+			span, parentSpanID := StartTraceSpan(context, routeToTagMapValue.OperationName, routeToTagMapValue.Metatags)
 
 			/*EXTRACTING TRACID AND SPANID FROM SPAN
 			  CREATING THE IDENTIFIER TO INJECT IN CONTEXT*/
@@ -57,6 +55,8 @@ func middlewareTracing(next echo.HandlerFunc) echo.HandlerFunc {
 				//Finishing the span
 				span.Finish()
 			})
+		} else {
+			log.Println(color.Warn.Sprint("Wavefront Middleware... Tracing not configured for this route"))
 		}
 		return next(context)
 	}

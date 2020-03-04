@@ -1,6 +1,8 @@
 package echo
 
 import (
+	"github.com/labstack/echo"
+	"github.com/wavefronthq/wavefront-sdk-go/senders"
 	"gopkg.in/yaml.v2"
 )
 
@@ -16,7 +18,7 @@ type customTags struct {
 	StaticTags map[string]string `yaml:"staticTags"`
 }
 
-// TracerConfig can be used to define config while creating
+// tracerConfig can be used to define config while creating
 // tracer object
 type tracerConfig struct {
 	Cluster               string                        `yaml:"cluster"`
@@ -28,6 +30,15 @@ type tracerConfig struct {
 	RateSampler           uint64                        `yaml:"rateSampler"`
 	DurationSampler       int64                         `yaml:"durationSampler"`
 	RouteToTagsMap        map[string]routeToTagMapValue `yaml:"routesRegistration"`
+}
+
+// Config stores the middleware config
+type Config struct {
+	DirectCfg  *senders.DirectConfiguration
+	ProxyCfg   *senders.ProxyConfiguration
+	CfgFile    string
+	RoutesFile string
+	EchoWeb    *echo.Echo
 }
 
 //ReadConfigFromyaml reads the config file

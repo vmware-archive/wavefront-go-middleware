@@ -1,10 +1,13 @@
 package echo
 
 import (
+	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
 
+	"github.com/gookit/color"
 	"github.com/labstack/echo"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
@@ -23,78 +26,70 @@ var globalTracerConfig *tracerConfig
 // tracer object.
 // Call utils/wavefront.Tracer to access the tracer object
 //For proxy sender send token as empty string
-func InitTracer(configFilePath string, routesRegistrationFilePath string, echoWeb *echo.Echo, sendDirectly bool, server string, token string, flushIntervalSeconds int) error {
+func InitTracer(cfg Config) error {
 
 	//Constructing globalTracerConfig from config file
-	tracerConfig, err := readConfigFromYaml(configFilePath)
+	tracerConfig, err := readConfigFromYaml(cfg.CfgFile)
 	if err != nil {
-		return err
+		return fmt.Errorf("error reading config file: %w", err)
 	}
 	//Registering routes
-	tracerConfig, err = readConfigFromYaml(routesRegistrationFilePath)
+	tracerConfig, err = readConfigFromYaml(cfg.RoutesFile)
 	if err != nil {
-		return err
+		return fmt.Errorf("error reading routes file: %w", err)
 	}
 
 	var sender senders.Sender
-	if sendDirectly {
+	if cfg.DirectCfg != nil {
 		// Create the direct sender
-		sender, err = getWavefrontDirectSender(server, token, flushIntervalSeconds)
+		sender, err = senders.NewDirectSender(cfg.DirectCfg)
+		if err != nil {
+			return err
+		}
+	} else if cfg.ProxyCfg != nil {
+		// Create the proxy sender
+		sender, err = senders.NewProxySender(cfg.ProxyCfg)
 		if err != nil {
 			return err
 		}
 	} else {
-		// Create the proxy sender
-		sender, err = getWavefrontProxySender(server, flushIntervalSeconds)
-		if err != nil {
-			return err
-		}
+		return errors.New(color.Error.Sprint("Wavefront Middleware... at least one of Direct Sender or Proxy Sender configuration must be passed"))
 	}
+
 	appTags := wfApplication.New(tracerConfig.Application, tracerConfig.Service)
-	if tracerConfig != nil {
-		if len(tracerConfig.Cluster) > 0 {
-			appTags.Cluster = tracerConfig.Cluster
-		}
-		if len(tracerConfig.Shard) > 0 {
-			appTags.Shard = tracerConfig.Shard
-		}
-		if tracerConfig.CustomApplicationTags.StaticTags != nil && len(tracerConfig.CustomApplicationTags.StaticTags) > 0 {
-			for k, v := range tracerConfig.CustomApplicationTags.StaticTags {
-				appTags.CustomTags[k] = v
-			}
+	if len(tracerConfig.Cluster) > 0 {
+		appTags.Cluster = tracerConfig.Cluster
+	}
+	if len(tracerConfig.Shard) > 0 {
+		appTags.Shard = tracerConfig.Shard
+	}
+	if tracerConfig.CustomApplicationTags.StaticTags != nil && len(tracerConfig.CustomApplicationTags.StaticTags) > 0 {
+		for k, v := range tracerConfig.CustomApplicationTags.StaticTags {
+			appTags.CustomTags[k] = v
 		}
 	}
+
 	wfReporter := reporter.New(sender, appTags, reporter.Source(tracerConfig.Source))
-	clReporter := reporter.NewConsoleSpanReporter(tracerConfig.Source)
-	reporter := reporter.NewCompositeSpanReporter(wfReporter, clReporter)
-	var durationSampler tracer.DurationSampler
-	var rateSampler tracer.RateSampler
 
 	//Initialising tracer with RateSampler and DurationSampler if given in conifg
 	//If values for RateSampler and DurationSampler is not given, it initalises standard tracer with default values
-	if tracerConfig.DurationSampler > 0 && tracerConfig.RateSampler > 0 {
-		durationSampler = tracer.DurationSampler{Duration: time.Duration(tracerConfig.DurationSampler) * time.Second}
-		rateSampler = tracer.RateSampler{Rate: tracerConfig.RateSampler}
-
-		Tracer = wfTracer.New(reporter, wfTracer.WithSampler(rateSampler), wfTracer.WithSampler(durationSampler))
-	} else if tracerConfig.RateSampler > 0 {
-		rateSampler = tracer.RateSampler{Rate: tracerConfig.RateSampler}
-
-		Tracer = wfTracer.New(reporter, wfTracer.WithSampler(rateSampler))
-	} else if tracerConfig.DurationSampler > 0 {
-		durationSampler = tracer.DurationSampler{Duration: time.Duration(tracerConfig.DurationSampler) * time.Second}
-
-		Tracer = wfTracer.New(reporter, wfTracer.WithSampler(durationSampler))
-	} else {
-		Tracer = wfTracer.New(reporter)
+	var samplers []wfTracer.Option
+	if tracerConfig.DurationSampler > 0 {
+		samplers = append(samplers, wfTracer.WithSampler(tracer.DurationSampler{Duration: time.Duration(tracerConfig.DurationSampler) * time.Second}))
 	}
+	if tracerConfig.RateSampler > 0 {
+		samplers = append(samplers, wfTracer.WithSampler(tracer.RateSampler{Rate: tracerConfig.RateSampler}))
+	}
+	Tracer = wfTracer.New(wfReporter, samplers...)
 
 	//Instantiating Global Tracer
-	opentracing.InitGlobalTracer(Tracer)
+	opentracing.SetGlobalTracer(Tracer)
 
 	//Enabling Middleware
-	echoWeb.Use(middlewareTracing)
-	log.Println("Tracer Initialized...")
+	cfg.EchoWeb.Use(TracingHandler)
+
+	log.Println(color.Success.Sprint("Wavefront Middleware... Tracer Initialized..."))
+
 	return nil
 }
 
@@ -103,7 +98,7 @@ func InitTracer(configFilePath string, routesRegistrationFilePath string, echoWe
 //Else it starts a root span.
 //Tags are added to the respective spans created.
 //If parent span exists parent span id is returned along with child span otherwise root span and "" is returned
-func StartTraceSpan(c echo.Context, appSpecificOperationName string, tags map[string]string) (opentracing.Span, string, error) {
+func StartTraceSpan(c echo.Context, appSpecificOperationName string, tags map[string]string) (opentracing.Span, string) {
 	var serverSpan opentracing.Span
 	var parentSpanID string
 	wireContext, err := opentracing.GlobalTracer().Extract(
@@ -132,18 +127,17 @@ func StartTraceSpan(c echo.Context, appSpecificOperationName string, tags map[st
 		}
 	}
 
-	return serverSpan, parentSpanID, nil
+	return serverSpan, parentSpanID
 }
 
-//InjectTracerHTTP injects the current span into the tracer.
-//Adds the context of the current span to the headers of the Http request
-//to the previous span of the tracer.
-func InjectTracerHTTP(tracer opentracing.Tracer, serverSpan opentracing.Span, httpReq *http.Request) *http.Request {
-	tracer.Inject(
+//InjectTracerHTTP injects the current span into the trace.
+//By Adding the context of the current span to the headers of the Http request.
+func InjectTracerHTTP(tracer opentracing.Tracer, serverSpan opentracing.Span, httpReq *http.Request) error {
+	err := tracer.Inject(
 		serverSpan.Context(),
 		opentracing.HTTPHeaders,
 		opentracing.HTTPHeadersCarrier(httpReq.Header))
-	return httpReq
+	return err
 }
 
 //GetTracingHeadersToInjectFromSpan returns the headers
@@ -156,7 +150,7 @@ func GetTracingHeadersToInjectFromSpan(tracer opentracing.Tracer, serverSpan ope
 		serverSpan.Context(),
 		opentracing.HTTPHeaders,
 		opentracing.HTTPHeadersCarrier(httpReq.Header))
-	headersToBeInjected := make(map[string]string)
+	headersToBeInjected := make(map[string]string, len(httpReq.Header))
 	for key, value := range httpReq.Header {
 		headersToBeInjected[key] = value[0]
 	}
@@ -168,6 +162,5 @@ func GetTracingHeadersToInjectFromSpan(tracer opentracing.Tracer, serverSpan ope
 //the echo context
 //To be used when using middleware
 func GetTracingHeadersToInjectFromContext(context echo.Context) map[string]string {
-	headersToBeInjected := context.Get("propagationHeaders").(map[string]string)
-	return headersToBeInjected
+	return context.Get("propagationHeaders").(map[string]string)
 }

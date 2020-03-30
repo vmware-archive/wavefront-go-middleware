@@ -40,7 +40,7 @@ func TestContextIdentifierLogPrefixInjection(t *testing.T) {
 		EchoWeb:    e,
 		DirectCfg:  directCfg,
 	}
-	
+
 	err = InitTracer(cfg)
 	if err != nil {
 		t.Error("Failed Initalising Tracer", err)

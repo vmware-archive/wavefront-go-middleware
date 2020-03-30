@@ -30,12 +30,12 @@ func InitTracer(cfg Config) error {
 	//Constructing globalTracerConfig from config file
 	tracerConfig, err := readConfigFromYaml(cfg.CfgFile)
 	if err != nil {
-		return fmt.Errorf("error reading config file: %w", err)
+		return fmt.Errorf("error reading config file: %v", err)
 	}
 	//Registering routes
 	tracerConfig, err = readConfigFromYaml(cfg.RoutesFile)
 	if err != nil {
-		return fmt.Errorf("error reading routes file: %w", err)
+		return fmt.Errorf("error reading routes file: %v", err)
 	}
 
 	var sender senders.Sender

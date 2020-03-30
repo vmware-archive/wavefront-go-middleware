@@ -1,0 +1,30 @@
+language: go
+
+# workaround for case sensitive build issues with wavefrontHQ
+go_import_path: github.com/wavefronthq/wavefront-go-middleware
+
+go:
+  - "1.11.x"
+  - master 
+
+# Force-enable Go modules. Not required once Go 1.14 lands.
+env: GO111MODULE=on
+
+matrix:
+  # It's ok if our code fails on unstable development versions of Go.
+  allow_failures:
+    - go: master
+  # Don't wait for tip tests to finish. Mark the test run green if the
+  # tests pass on the stable versions of Go.
+  fast_finish: true
+
+# Don't email me the results of the test runs.
+notifications:
+  email: false
+
+# script always run to completion (set +e).
+script:
+  - go get -t -v ./...
+  - diff -u <(echo -n) <(gofmt -d $(go list -f {{.Dir}} ./... | grep -v /vendor/))
+  - go test -v -race ./...                   # Run all the tests with the race detector enabled
+  - go vet ./...                             # go vet is the official Go static analyzer

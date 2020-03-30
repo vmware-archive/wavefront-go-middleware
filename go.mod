@@ -3,6 +3,7 @@ module github.com/wavefronthq/wavefront-go-middleware
 go 1.13
 
 require (
+	github.com/caio/go-tdigest v2.3.0+incompatible
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/golang/protobuf v1.3.4 // indirect

@@ -4,7 +4,6 @@ language: go
 go_import_path: github.com/wavefronthq/wavefront-go-middleware
 
 go:
-  - "1.10.x"
   - "1.11.x"
   - master 
 
@@ -26,6 +25,5 @@ notifications:
 # script always run to completion (set +e).
 script:
   - go get -t -v ./...
-  - diff -u <(echo -n) <(gofmt -d $(find . -path ./vendor -prune -o -name '*.go' -print)) # exlude vendor dir
   - go test -v -race ./...                   # Run all the tests with the race detector enabled
   - go vet ./...                             # go vet is the official Go static analyzer

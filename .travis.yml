@@ -8,12 +8,8 @@ go:
   - "1.11.x"
   - master 
 
-before_install:
-  # Setup dependency management tool
-  - curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-
-install:
-  - dep ensure
+# Force-enable Go modules. Not required once Go 1.14 lands.
+env: GO111MODULE=on
 
 matrix:
   # It's ok if our code fails on unstable development versions of Go.

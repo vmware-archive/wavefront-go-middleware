@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/gookit/color"
 	"github.com/labstack/echo"
 	"github.com/opentracing/opentracing-go"
 	"github.com/wavefronthq/wavefront-opentracing-sdk-go/tracer"
@@ -56,7 +55,7 @@ func TracingHandler(next echo.HandlerFunc) echo.HandlerFunc {
 				span.Finish()
 			})
 		} else {
-			log.Println(color.Warn.Sprint("Wavefront Middleware... Tracing not configured for this route"))
+			log.Println("wavefront middleware: tracing not configured for this route")
 		}
 		return next(context)
 	}

@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gookit/color"
 	"github.com/labstack/echo"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
@@ -53,7 +52,7 @@ func InitTracer(cfg Config) error {
 			return err
 		}
 	} else {
-		return errors.New(color.Error.Sprint("Wavefront Middleware... at least one of Direct Sender or Proxy Sender configuration must be passed"))
+		return errors.New("wavefront middleware: one of Direct sender or Proxy sender configuration is required")
 	}
 
 	appTags := wfApplication.New(tracerConfig.Application, tracerConfig.Service)
@@ -88,7 +87,7 @@ func InitTracer(cfg Config) error {
 	//Enabling Middleware
 	cfg.EchoWeb.Use(TracingHandler)
 
-	log.Println(color.Success.Sprint("Wavefront Middleware... Tracer Initialized..."))
+	log.Println("wavefront middleware: tracer initialized")
 
 	return nil
 }

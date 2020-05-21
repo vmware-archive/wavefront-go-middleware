@@ -71,7 +71,7 @@ func InitTracer(cfg Config) error {
 	wfReporter := reporter.New(sender, appTags, reporter.Source(tracerConfig.Source))
 
 	//Initialising tracer with RateSampler and DurationSampler if given in conifg
-	//If values for RateSampler and DurationSampler is not given, it initalises standard tracer with default values
+	//If values for RateSampler and DurationSampler is not given, it initialises standard tracer with default values
 	var samplers []wfTracer.Option
 	if tracerConfig.DurationSampler > 0 {
 		samplers = append(samplers, wfTracer.WithSampler(tracer.DurationSampler{Duration: time.Duration(tracerConfig.DurationSampler) * time.Second}))
@@ -161,5 +161,9 @@ func GetTracingHeadersToInjectFromSpan(tracer opentracing.Tracer, serverSpan ope
 //the echo context
 //To be used when using middleware
 func GetTracingHeadersToInjectFromContext(context echo.Context) map[string]string {
-	return context.Get("propagationHeaders").(map[string]string)
+	tracingHeaders := context.Get("propagationHeaders")
+	if tracingHeaders == nil {
+		return nil
+	}
+	return tracingHeaders.(map[string]string)
 }

@@ -1,23 +1,5 @@
 # Middleware-echoweb
 
-This library provides wavefront-opentracing-middleware support for Go's web framework Echo. The middleware takes care of the entire lifecycle of span reporting with minimal code injection in Api's. It provides a custom logger abstracted on top of Go standard Logger which injects request-scoped unique trace identifiers into logs generated while servicing an Api request. 
-## Prerequisites
--   Go 1.10 or higher.
--   Import Wavefront packages.
-```go
-import (
-
-"github.com/wavefronthq/wavefront-opentracing-sdk-go/reporter"
-
-"github.com/wavefronthq/wavefront-opentracing-sdk-go/tracer"
-
-"github.com/wavefronthq/wavefront-sdk-go/application"
-
-"github.com/wavefronthq/wavefront-sdk-go/senders"
-
-)
-```
-
 ## Instrumentation
 
 1. Create `Cfg.yaml file`

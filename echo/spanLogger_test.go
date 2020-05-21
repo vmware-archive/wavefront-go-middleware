@@ -43,7 +43,7 @@ func TestContextIdentifierLogPrefixInjection(t *testing.T) {
 
 	err = InitTracer(cfg)
 	if err != nil {
-		t.Error("Failed Initalising Tracer", err)
+		t.Error("Failed Initialising Tracer", err)
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
